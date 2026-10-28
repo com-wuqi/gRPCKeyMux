@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/aiwaki/makc"
-	"github.com/rpdg/winput"
 )
 
 // The benchmarks in this file cover the pure lookup layer. They allocate
@@ -109,33 +108,6 @@ func BenchmarkKeyCodesFromMakc(b *testing.B) {
 			kc, ok := KeyCodesFromMakc(makc.Key(0xFFFF))
 			if ok {
 				b.Fatal("unexpected makc lookup hit")
-			}
-			benchSinkKey = kc
-		}
-	})
-}
-
-func BenchmarkKeyCodesFromWinput(b *testing.B) {
-	a, ok := KeyCodesFromName("space")
-	if !ok {
-		b.Fatal("key space is missing from the table")
-	}
-	b.Run("hit", func(b *testing.B) {
-		b.ReportAllocs()
-		for i := 0; i < b.N; i++ {
-			kc, ok := KeyCodesFromWinput(a.Winput)
-			if !ok {
-				b.Fatal("winput lookup miss")
-			}
-			benchSinkKey = kc
-		}
-	})
-	b.Run("miss", func(b *testing.B) {
-		b.ReportAllocs()
-		for i := 0; i < b.N; i++ {
-			kc, ok := KeyCodesFromWinput(winput.Key(0xFFFF))
-			if ok {
-				b.Fatal("unexpected winput lookup hit")
 			}
 			benchSinkKey = kc
 		}

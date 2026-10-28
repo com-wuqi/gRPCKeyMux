@@ -1,5 +1,7 @@
 # GoKeyMux 性能基准报告
 
+> 平台说明：本报告的全部数据均在 Windows 上采集；Linux 的基准矩阵尚未建立，跨平台改动后请以同机前后对比为准。
+
 - 日期：2026-10-20
 - 基线代码：`8f12e5f`（工作区另含本次新增的基准与文档）
 - 基准实现：`internal/engine/bench_helpers_test.go`、`internal/input/keymap_bench_test.go`、`internal/engine/engines_bench_test.go`、`internal/service/grpc_bench_test.go`、`internal/engine/realbackend_bench_test.go`、`bench/e2e.ps1`

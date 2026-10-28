@@ -3,7 +3,6 @@ package engine
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"slices"
 	"sync"
@@ -12,9 +11,6 @@ import (
 
 	"GoKeyMux/internal/config"
 	"GoKeyMux/internal/input"
-
-	"github.com/aiwaki/makc"
-	"github.com/rpdg/winput"
 )
 
 // defaultDispatchQueueSize is used when the configured dispatchQueueSize is
@@ -45,7 +41,7 @@ type mouseOp struct {
 }
 
 type Engine struct {
-	driveClient any
+	driveClient input.Backend
 	// driveName is captured at StartEngine time. Using it instead of reading
 	// config.GlobalConfig at dispatch/close time keeps the whole lifecycle bound to a
 	// single backend even if the global config is mutated later.
@@ -101,48 +97,15 @@ func NewEngine() *Engine {
 
 func (e *Engine) StartEngine() error {
 	e.driveName = config.GlobalConfig.EnabledDriveName
-	switch e.driveName {
-	case DriveMakc:
-		{
-			client, err := input.MakcInputInit()
-			if err != nil {
-				return err
-			}
-			e.driveClient = client
-		}
-	case DriveFakerInput:
-		{
-			client, err := input.FakerInputInit()
-			if err != nil {
-				return err
-			}
-			e.driveClient = client
-		}
-	case DriveWinputWithWindow:
-		{
-			window, err := input.WinputInitWithWindow()
-			if err != nil {
-				return err
-			}
-			slog.Warn("使用winput可能会导致键鼠输入串行化")
-			e.driveClient = window
-		}
-	case DriveWinputWithInterception:
-		{
-			if err := input.WinputWithInterceptionInit(); err != nil {
-				return err
-			}
-			slog.Warn("使用winput可能会导致键鼠输入串行化")
-			e.driveClient = nil
-		}
-	case DriveNoop:
-		{
-			e.driveClient = input.NewNoopDevice(time.Duration(config.GlobalConfig.NoopLatencyMicros) * time.Microsecond)
-			slog.Debug("debug driver ready")
-		}
-	default:
-		return fmt.Errorf("unsupported drive %s", config.GlobalConfig.EnabledDriveName)
+	backend, err := input.NewBackend(
+		e.driveName,
+		time.Duration(config.GlobalConfig.NoopLatencyMicros)*time.Microsecond,
+	)
+	if err != nil {
+		return err
 	}
+	e.driveClient = backend
+	slog.Debug("input backend ready", "drive", e.driveName, "backend", backend.Name())
 
 	// Start the workers after the backend is initialized so the goroutines see
 	// the fully populated driveClient (the go statement establishes a
@@ -172,39 +135,8 @@ func (e *Engine) CloseEngine() error {
 		// return, so waiting here ensures the backend is no longer in use.
 		e.wg.Wait()
 
-		switch e.driveName {
-		case DriveMakc:
-			{
-				if client, ok := e.driveClient.(*makc.Client); ok {
-					e.closeErr = client.Close()
-				} else if e.driveClient != nil {
-					e.closeErr = fmt.Errorf("drive is not '*makc.Client'")
-				}
-			}
-		case DriveFakerInput:
-			{
-				if client, ok := e.driveClient.(*input.FakerInputDevice); ok {
-					e.closeErr = client.Close()
-				} else if e.driveClient != nil {
-					e.closeErr = fmt.Errorf("drive is not '*input.FakerInputDevice'")
-				}
-			}
-		case DriveWinputWithWindow, DriveWinputWithInterception:
-			{
-				e.closeErr = nil
-			}
-		case DriveNoop:
-			{
-				if client, ok := e.driveClient.(*input.NoopDevice); ok {
-					e.closeErr = client.Close()
-				} else if e.driveClient != nil {
-					e.closeErr = fmt.Errorf("drive is not '*input.NoopDevice'")
-				}
-			}
-		default:
-			if e.driveName != "" {
-				e.closeErr = fmt.Errorf("unsupported drive %s", e.driveName)
-			}
+		if e.driveClient != nil {
+			e.closeErr = e.driveClient.Close()
 		}
 	})
 	return e.closeErr
@@ -379,222 +311,46 @@ func (e *Engine) submit(ctx context.Context, isPressed bool, keys []KeyCodes) er
 // It is only ever invoked from the worker goroutine, so it may safely assume
 // exclusive access to the backend.
 func (e *Engine) apply(ctx context.Context, keys []KeyCodes, isPressed bool) error {
-	switch e.driveName {
-	case DriveMakc:
-		{
-			client, ok := e.driveClient.(*makc.Client)
-			if !ok {
-				return fmt.Errorf("drive is not '*makc.Client'")
-			}
-			for _, key := range keys {
-				if err := ctx.Err(); err != nil {
-					return err
-				}
-				key = e.effectiveKey(key, isPressed)
-				var err error
-				if isPressed {
-					err = input.MakcInputPress(client, key, ctx)
-				} else {
-					err = input.MakcInputRelease(client, key, ctx)
-				}
-				if err != nil {
-					return err
-				}
-				e.recordKeyState(key, isPressed)
-			}
-			return nil
-		}
-	case DriveFakerInput:
-		{
-			client, ok := e.driveClient.(*input.FakerInputDevice)
-			if !ok {
-				return fmt.Errorf("drive is not '*input.FakerInputDevice'")
-			}
-			for _, key := range keys {
-				if err := ctx.Err(); err != nil {
-					return err
-				}
-				key = e.effectiveKey(key, isPressed)
-				var err error
-				if isPressed {
-					err = client.KeyDown(key.FakerInput, key.Modifiers)
-				} else {
-					err = client.KeyUp(key.FakerInput, key.Modifiers)
-				}
-				if err != nil {
-					return err
-				}
-				e.recordKeyState(key, isPressed)
-			}
-			return nil
-		}
-	case DriveWinputWithWindow:
-		{
-			target, ok := e.driveClient.(*winput.Window)
-			if !ok {
-				return fmt.Errorf("drive is not '*winput.Window'")
-			}
-			for _, key := range keys {
-				if err := ctx.Err(); err != nil {
-					return err
-				}
-				key = e.effectiveKey(key, isPressed)
-				var err error
-				if isPressed {
-					err = input.WinputWithWindowPress(target, key)
-				} else {
-					err = input.WinputWithWindowRelease(target, key)
-				}
-				if err != nil {
-					return err
-				}
-				e.recordKeyState(key, isPressed)
-			}
-			return nil
-		}
-	case DriveWinputWithInterception:
-		{
-			for _, key := range keys {
-				if err := ctx.Err(); err != nil {
-					return err
-				}
-				key = e.effectiveKey(key, isPressed)
-				var err error
-				if isPressed {
-					err = input.WinputWithInterceptionPress(key)
-				} else {
-					err = input.WinputWithInterceptionRelease(key)
-				}
-				if err != nil {
-					return err
-				}
-				e.recordKeyState(key, isPressed)
-			}
-			return nil
-		}
-	case DriveNoop:
-		{
-			client, ok := e.driveClient.(*input.NoopDevice)
-			if !ok {
-				return fmt.Errorf("drive is not '*input.NoopDevice'")
-			}
-			for _, key := range keys {
-				if err := ctx.Err(); err != nil {
-					return err
-				}
-				key = e.effectiveKey(key, isPressed)
-				var err error
-				if isPressed {
-					err = client.Press(ctx, key)
-				} else {
-					err = client.Release(ctx, key)
-				}
-				if err != nil {
-					return err
-				}
-				e.recordKeyState(key, isPressed)
-			}
-			return nil
-		}
-	default:
-		return fmt.Errorf("unsupported drive %s", e.driveName)
+	if e.driveClient == nil {
+		return errors.New("input backend is not initialized")
 	}
+	for _, key := range keys {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		key = e.effectiveKey(key, isPressed)
+		var err error
+		if isPressed {
+			err = e.driveClient.Press(ctx, key)
+		} else {
+			err = e.driveClient.Release(ctx, key)
+		}
+		if err != nil {
+			return err
+		}
+		e.recordKeyState(key, isPressed)
+	}
+	return nil
 }
 
 // applyMouse performs a single mouse operation on the configured backend. It is
-// only ever invoked from the mouse worker goroutine. Each driver maps the
-// backend-neutral mouseEvent to its own representation; drivers that do not
-// implement mouse injection yet return an explicit error.
+// only ever invoked from the mouse worker goroutine. Each backend maps the
+// backend-neutral mouseEvent to its own representation; backends that do not
+// implement mouse injection return an explicit error.
 func (e *Engine) applyMouse(ctx context.Context, ev mouseEvent) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	switch e.driveName {
-	case DriveFakerInput:
-		{
-			client, ok := e.driveClient.(*input.FakerInputDevice)
-			if !ok {
-				return fmt.Errorf("drive is not '*input.FakerInputDevice'")
-			}
-			switch ev.Kind {
-			case mouseEventMoveRel:
-				return client.MouseMove(input.FakerInputRelDelta(ev.DX), input.FakerInputRelDelta(ev.DY))
-			case mouseEventMoveAbs:
-				return client.MouseMoveTo(input.FakerInputAbsCoordinate(ev.X), input.FakerInputAbsCoordinate(ev.Y))
-			case mouseEventButton:
-				button, err := input.FakerInputMouseButton(ev.Button)
-				if err != nil {
-					return err
-				}
-				if ev.IsPressed {
-					if err := client.MouseButtonDown(button); err != nil {
-						return err
-					}
-				} else {
-					if err := client.MouseButtonUp(button); err != nil {
-						return err
-					}
-				}
-				e.recordMouseButton(ev.Button, ev.IsPressed)
-				return nil
-			case mouseEventWheel:
-				return client.MouseWheel(int8(ev.Delta))
-			case mouseEventHWheel:
-				return client.MouseHWheel(int8(ev.Delta))
-			default:
-				return fmt.Errorf("unknown mouse event %d", ev.Kind)
-			}
-		}
-	case DriveNoop:
-		{
-			client, ok := e.driveClient.(*input.NoopDevice)
-			if !ok {
-				return fmt.Errorf("drive is not '*input.NoopDevice'")
-			}
-			if err := client.Mouse(ctx, ev); err != nil {
-				return err
-			}
-			if ev.Kind == mouseEventButton {
-				e.recordMouseButton(ev.Button, ev.IsPressed)
-			}
-			return nil
-		}
-	case DriveMakc:
-		{
-			client, ok := e.driveClient.(*makc.Client)
-			if !ok {
-				return fmt.Errorf("drive is not '*makc.Client'")
-			}
-			switch ev.Kind {
-			case mouseEventMoveRel:
-				return input.MakcInputMouseMove(client, ev.DX, ev.DY, ctx)
-			case mouseEventMoveAbs:
-				return input.MakcInputMouseMoveTo(client, ev.X, ev.Y, ctx)
-			case mouseEventButton:
-				if ev.IsPressed {
-					if err := input.MakcInputMouseButtonDown(client, ev.Button, ctx); err != nil {
-						return err
-					}
-				} else {
-					if err := input.MakcInputMouseButtonUp(client, ev.Button, ctx); err != nil {
-						return err
-					}
-				}
-				e.recordMouseButton(ev.Button, ev.IsPressed)
-				return nil
-			case mouseEventWheel:
-				return input.MakcInputMouseWheel(client, ev.Delta, ctx)
-			case mouseEventHWheel:
-				return input.MakcInputMouseHWheel(client, ev.Delta, ctx)
-			default:
-				return fmt.Errorf("unknown mouse event %d", ev.Kind)
-			}
-		}
-	case DriveWinputWithWindow, DriveWinputWithInterception:
-		return fmt.Errorf("mouse not implemented for drive %s", e.driveName)
-	default:
-		return fmt.Errorf("unsupported drive %s", e.driveName)
+	if e.driveClient == nil {
+		return errors.New("input backend is not initialized")
 	}
+	if err := e.driveClient.Mouse(ctx, ev); err != nil {
+		return err
+	}
+	if ev.Kind == mouseEventButton {
+		e.recordMouseButton(ev.Button, ev.IsPressed)
+	}
+	return nil
 }
 
 // effectiveKey resolves which key to send to the backend. For a press it is the
@@ -682,7 +438,6 @@ func (e *Engine) releaseHeldKeys() {
 		if err := e.apply(context.Background(), []KeyCodes{key}, false); err != nil {
 			slog.Warn("release held key on shutdown failed",
 				"makc", key.Makc,
-				"winput", key.Winput,
 				"fakerInput", key.FakerInput,
 				"modifiers", key.Modifiers,
 				"err", err,

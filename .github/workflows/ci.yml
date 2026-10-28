@@ -32,3 +32,38 @@ jobs:
           go build -ldflags $LdFlags -o build/GoKeyMux.exe .
           go build -o build/keycycle.exe ./cmd/keycycle
           go build -o build/loadtest.exe ./cmd/loadtest
+
+  build-test-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test ./...
+
+      - name: Build
+        env:
+          CGO_ENABLED: '0'
+        run: |
+          mkdir -p build
+          Commit=$(git rev-parse --short HEAD)
+          BuildTime=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+          LdFlags="-X GoKeyMux/version.Version=dev -X GoKeyMux/version.Commit=$Commit -X GoKeyMux/version.BuildTime=$BuildTime"
+          go build -ldflags "$LdFlags" -o build/GoKeyMux .
+          go build -o build/keycycle ./cmd/keycycle
+          go build -o build/loadtest ./cmd/loadtest
+
+      - name: Cross-build linux/arm64
+        env:
+          GOOS: linux
+          GOARCH: arm64
+          CGO_ENABLED: '0'
+        run: go build ./...

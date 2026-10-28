@@ -1,8 +1,14 @@
-# GoKeyMux
+# gRPCKeyMux
 
-GoKeyMux 是一个运行在 **Windows** 上的输入注入服务（键盘 / 鼠标输入多路复用器）。它通过 gRPC 暴露接口，接收“按键按下 /
+GoKeyMux 是一个跨平台的输入注入服务（键盘 / 鼠标输入多路复用器）。它通过 gRPC 暴露接口，接收“按键按下 /
 释放”与鼠标事件请求，并转发到可插拔的输入注入后端。其目标是统一多种输入注入方案（驱动 / 虚拟 HID /
 窗口消息）为同一个接口，方便游戏自动化等本机场景。
+
+支持的平台：
+
+- **Windows**：全部 5 种后端（x86 / x64）。
+- **Linux**：`makc` 与 `noop` 后端；支持 X11 与 Wayland（`uinput` / XDG Portal）。Linux 目前不提供 FakerInput /
+  winput 后端。
 
 > [!WARNING]
 > **仅限本机使用 (Local Use Only)**  
@@ -30,8 +36,9 @@ IP。若监听地址不是回环地址，服务启动时会打印警告。将服
 ## 特性
 
 - **gRPC 服务**：提供客户端流式 `keyService`、`MouseService` 与一元 `keyServiceDebug` 三个 RPC。
-- **可插拔后端**：内置 5 种输入注入后端，通过配置切换。
-- **统一按键映射**：一套逻辑按键同时映射三种编码（Windows 虚拟键码 / Interception 扫描码 / USB HID 键码）。
+- **可插拔后端**：Windows 内置 5 种输入注入后端；Linux 提供 `makc` 与 `noop`，通过配置切换。
+- **统一按键映射**：一套逻辑按键映射 Windows 虚拟键码与 USB HID 键码；Windows 的 winput 后端按需派生
+  Interception 扫描码。
 - **安全退出**：正常退出时自动释放所有仍按下的键盘键与鼠标按钮，避免残留卡键。
 - **服务治理**：健康检查、keepalive 策略、请求日志拦截器、pprof 性能分析。
 - **配置驱动**：运行期通过 `config.json` 配置（缺失时自动生成默认配置）。
@@ -41,17 +48,22 @@ IP。若监听地址不是回环地址，服务启动时会打印警告。将服
 
 通过 `config.json` 中的 `driveName` 选择：
 
-| driveName                | 实现方式                                               | 依赖 / 说明                                         |
-|--------------------------|--------------------------------------------------------|-----------------------------------------------------|
-| `makc`                   | [aiwaki/makc](https://github.com/aiwaki/makc) 键盘注入 | 无需额外驱动（默认后端）                            |
-| `winputWithWindow`       | [rpdg/winput](https://github.com/rpdg/winput) 窗口消息 | 按进程名查找目标窗口发送按键；需要目标进程在运行    |
-| `winputWithInterception` | winput + Interception 驱动                             | 内核级注入，抗检测较好；需安装 Interception 驱动    |
-| `fakerInput`             | FakerInput 虚拟 HID 设备                               | 自行枚举并写入 HID 报告；需安装 FakerInput 虚拟设备 |
-| `noop`                   | 空操作                                                 | 不注入任何按键，仅用于压测服务层；可配置模拟延迟    |
+| driveName                | 实现方式                                               | 平台            | 依赖 / 说明                                         |
+|--------------------------|--------------------------------------------------------|-----------------|-----------------------------------------------------|
+| `makc`                   | [aiwaki/makc](https://github.com/aiwaki/makc) 键盘/鼠标注入 | Windows / Linux | 无需额外驱动（默认后端）                            |
+| `winputWithWindow`       | [rpdg/winput](https://github.com/rpdg/winput) 窗口消息 | 仅 Windows      | 按进程名查找目标窗口发送按键；需要目标进程在运行    |
+| `winputWithInterception` | winput + Interception 驱动                             | 仅 Windows      | 内核级注入，抗检测较好；需安装 Interception 驱动    |
+| `fakerInput`             | FakerInput 虚拟 HID 设备                               | 仅 Windows      | 自行枚举并写入 HID 报告；需安装 FakerInput 虚拟设备 |
+| `noop`                   | 空操作                                                 | Windows / Linux | 不注入任何按键，仅用于压测服务层；可配置模拟延迟    |
+
+> Linux 上选择 `fakerInput` / `winputWithWindow` / `winputWithInterception` 会在启动时返回明确的“仅 Windows 支持”错误；
+> `makc` 与 `noop` 可正常使用。
 
 ## 先决条件
 
-- **操作系统**：Windows（仅支持 x86 / x64，ARM64 不支持）。
+- **操作系统**：
+    - Windows：x86 / x64（ARM64 不支持）。
+    - Linux：X11 或 Wayland；`amd64` 为主要目标（需在实机完成运行验收），`arm64` 支持交叉编译（尚未实机验收）。
 - **Go**：1.27 或更高版本（见 `go.mod`）。
 - **按后端可选依赖**：
     - `winputWithInterception`：安装 Interception 驱动。以 **管理员身份**打开 cmd，运行
@@ -61,8 +73,15 @@ IP。若监听地址不是回环地址，服务启动时会打印警告。将服
       `FakerInput_Setup_0.1.1_x64.msi`。
     - `winputWithWindow`：需要目标进程在运行（默认查找进程名 `Game.exe`）。
     - `makc` / `noop`：无需额外依赖。
+    - Linux `makc` + X11：需要可写的 `/dev/uinput`。推荐通过 udev 规则给 `input` 组授权（makc 仓库提供
+      `scripts/linux-uinput-permissions.sh`），不要以 root 运行服务。
+    - Linux `makc` + Wayland：使用 XDG Desktop Portal 的 RemoteDesktop 接口；首次启动会弹出一次授权框，
+      需要 `xdg-desktop-portal` 及桌面环境（GNOME / KDE / wlroots）支持。Wayland 下绝对鼠标移动不可用
+      （见下方已知限制）。
 
 ## 构建
+
+Windows：
 
 ```powershell
 # 服务端
@@ -75,17 +94,37 @@ go build -o keycycle.exe ./cmd/keycycle
 go build -o loadtest.exe ./cmd/loadtest
 ```
 
+Linux：
+
+```sh
+go build -o GoKeyMux .
+go build -o keycycle ./cmd/keycycle
+go build -o loadtest ./cmd/loadtest
+
+# 或注入版本信息（与 build.ps1 等价）
+sh build.sh
+```
+
 > 说明：
-> - 仓库通过 `.gitignore` 忽略了编译产物（`*.exe`）与 `config.json`，未提交二进制文件，请从源码自行构建（见上方命令）。
+> - 仓库通过 `.gitignore` 忽略了编译产物（`*.exe`、无扩展名的 `GoKeyMux` / `keycycle` / `loadtest`）与 `config.json`，
+>   未提交二进制文件，请从源码自行构建（见上方命令）。
 > - `winputWithInterception` 后端按可执行文件所在目录定位 `Interception/library/...` 下的 DLL；在仓库根目录直接构建运行即可，无需移动
-    `Interception` 目录。
+    `Interception` 目录。该后端与 `FakerInput` 仅在 Windows 构建中存在。
+> - Linux 构建为纯 Go（无 cgo），可直接交叉编译：
+    `GOOS=linux GOARCH=amd64 go build -o GoKeyMux .`；arm64 同理（`GOARCH=arm64`）。
 
 ### 构建时注入版本信息
 
-`GoKeyMux.exe` 支持在构建时通过 `-ldflags` 注入版本号（git tag）、打包时间（UTC）与提交哈希，并在启动日志中打印。推荐使用仓库根目录的构建脚本：
+`GoKeyMux` 支持在构建时通过 `-ldflags` 注入版本号（git tag）、打包时间（UTC）与提交哈希，并在启动日志中打印。推荐使用仓库根目录的构建脚本：
 
 ```powershell
+# Windows
 .\build.ps1
+```
+
+```sh
+# Linux / macOS
+sh build.sh
 ```
 
 脚本会自动计算并注入：
@@ -121,6 +160,8 @@ go build -o loadtest.exe ./cmd/loadtest
 | `pprofAddress`                       | string | `""`              | 可选 pprof 监听地址，空表示关闭（如 `localhost:6060`）      |
 | `noopLatencyMicros`                  | int    | `0`               | (`noop`) 每次按键模拟延迟，单位微秒                         |
 | `dispatchQueueSize`                  | int    | `1024`            | 按键派发队列缓冲大小；满时发送方 FIFO 阻塞                  |
+| `makcKeyboardBackend`                | string | `auto`            | (Linux `makc`) 键盘后端：`auto` / `uinput` / `xdgportal`；Windows 忽略 |
+| `makcMouseBackend`                   | string | `auto`            | (Linux `makc`) 鼠标后端：`auto` / `uinput` / `xdgportal`；Windows 忽略 |
 
 示例：
 
@@ -140,15 +181,30 @@ go build -o loadtest.exe ./cmd/loadtest
   "winputWindowIndex": 0,
   "pprofAddress": "",
   "noopLatencyMicros": 0,
-  "dispatchQueueSize": 1024
+  "dispatchQueueSize": 1024,
+  "makcKeyboardBackend": "auto",
+  "makcMouseBackend": "auto"
 }
 ```
 
+> Linux 下 `auto` 会根据会话协议选择后端：Wayland（`XDG_SESSION_TYPE=wayland` 或 `WAYLAND_DISPLAY` 非空）优先
+> `xdgportal`，X11（`XDG_SESSION_TYPE=x11` 或 `DISPLAY` 非空）优先 `uinput`；首选后端打开失败时会尝试另一个并在日志中
+> 说明。显式配置 `uinput` / `xdgportal` 时不回退。Windows 上这两个字段不生效，makc 保持平台默认选择。
+
 ## 运行
+
+Windows：
 
 ```powershell
 # 启动服务（默认读取同目录 config.json）
 .\GoKeyMux.exe
+```
+
+Linux：
+
+```sh
+# 启动服务（默认读取当前目录 config.json）
+./GoKeyMux
 ```
 
 启动后即可通过 gRPC 客户端（Go / Python / C# 等任意语言，按 `proto/gokeymux.proto` 生成桩代码）调用。
@@ -253,8 +309,11 @@ service rpcKeyService {
 | `SCROLL`      | 滚轮（使用 `scroll_delta`）              |
 | `UNKNOWN`     | 未定义，忽略                             |
 
-> 注意：鼠标注入仅 `makc`、`fakerInput`、`noop` 后端支持；`winputWithWindow` 与 `winputWithInterception`
-> 后端不支持鼠标，会返回 "mouse not implemented" 错误。
+> 注意：鼠标注入在 Windows 上由 `makc`、`fakerInput`、`noop` 支持，在 Linux 上由 `makc`、`noop` 支持；
+> `winputWithWindow` 与 `winputWithInterception` 不支持鼠标，会返回 "mouse not implemented" 错误。
+
+> **Wayland 限制**：Linux Wayland 会话（`xdgportal` 后端）不支持 `ABS_MOVE`，会返回明确错误；请使用相对
+> `MOVE`，或切换到 X11 会话。X11 + `uinput` 下 `ABS_MOVE` 正常工作。
 
 ## 按键与 rune 约定
 
@@ -271,6 +330,7 @@ service rpcKeyService {
 > **已知限制**：rune 模式中需要 Shift 的大写字母与符号（如 `A`、`!`、`@`、`?`）依赖 `KeyCodes.Modifiers`（修饰键标志位），
 > 该字段目前仅由 `fakerInput` 后端应用；`makc` 与 `winput` 后端会忽略它、只发送未加 Shift 的基键，因此这些字符在这两种
 > 后端下会输出不正确（例如 `A` 会变成 `a`）。此问题暂不修复，请在使用 `makc`/`winput` 后端时避免依赖 Shift 修饰。
+> 该限制在 Windows 与 Linux 的 `makc` 后端上相同。
 
 ## 测试
 
@@ -286,9 +346,14 @@ go test ./internal/input
 go test ./internal/engine
 ```
 
+> Linux 的 `integration` 测试会通过 `makc` 注入真实按键/鼠标事件，请只在可接受输入的环境运行。Linux 下没有
+> `fakerInput` / `winput` 设备测试，对应测试文件通过 build tag 自动排除。
+
 ## 性能基准
 
 基准分为四层：映射层、引擎层、服务层和端到端；另有默认不编译的真实后端基准。除最后一层外均**不会注入真实输入**。完整的方法、原始数据与分析见 [benchmark.md](benchmark.md)。
+
+> 下表中的参考数据均在 **Windows** 上采集，用于同机前后对比；Linux 尚未纳入基准矩阵。
 
 | 层级 | 文件 | 覆盖内容 |
 |------|------|----------|
@@ -475,7 +540,12 @@ go test -c -o .\GoKeyMux.realbench.test.exe -tags realbackend ./internal/engine
 
 ### CI（`.github/workflows/ci.yml`）
 
-`push` / `pull_request` 到 `master` 时触发，执行 `go vet` + `go test` + 三个二进制的 `go build`，用于每次合并前的快速校验。
+`push` / `pull_request` 到 `master` 时触发，并行执行 Windows 与 Linux 两个 job：
+
+- `build-test`（`windows-latest`）
+- `build-test-linux`（`ubuntu-latest`，`CGO_ENABLED=0`）
+
+两个 job 都会执行 `go vet` + `go test` + 三个二进制的 `go build`，用于每次合并前的快速校验。
 
 ### 发布（`.github/workflows/release.yml`）
 
@@ -488,12 +558,16 @@ go test -c -o .\GoKeyMux.realbench.test.exe -tags realbackend ./internal/engine
 预发布 tag 需符合 `vX.Y.Z-suffix` 形式（如 `v0.2.0-beta.2`、`v0.2.0-rc.1`），`alpha` / `beta` / `rc`
 等后缀均可；tag 构建时 `version.Version` 会原样注入 tag 名，因此预发布包在启动日志中可直接辨认。
 
-同时构建 **x64（amd64）** 与 **x86（386）** 两个平台，各产出一个 zip：
+发布 job 会等待两个构建 job 完成，然后一次性上传全部 zip。当前构建 4 个平台：
 
 - `GoKeyMux-windows-amd64.zip`
 - `GoKeyMux-windows-386.zip`
+- `GoKeyMux-linux-amd64.zip`
+- `GoKeyMux-linux-arm64.zip`
 
-每个 zip 均为扁平结构（解压后 exe 与 `Interception/`、`proto/` 同级，可直接运行）：
+> `linux-arm64` 已支持交叉编译并随发布产出，但尚未完成实机运行验收；如用于生产请先在目标设备验证。
+
+Windows 包为扁平结构（解压后 exe 与 `Interception/`、`proto/` 同级，可直接运行）：
 
 ```
 GoKeyMux-windows-amd64.zip
@@ -501,21 +575,41 @@ GoKeyMux-windows-amd64.zip
 ├── keycycle.exe
 ├── loadtest.exe
 ├── FakerInput_Setup_0.1.1_x64.msi   # 仅 amd64 包
-├── Interception/      # 运行时驱动库与许可证
-└── proto/             # gRPC 协议定义（供其他语言生成客户端桩）
+├── Interception/      # 运行时驱动库与许可证（仅 Windows）
+├── proto/             # gRPC 协议定义（供其他语言生成客户端桩）
+├── README.md
+├── LICENSE
+└── THIRD_PARTY_NOTICES
 
 GoKeyMux-windows-386.zip
 ├── GoKeyMux.exe
 ├── keycycle.exe
 ├── loadtest.exe
-├── Interception/      # 运行时驱动库与许可证
-└── proto/             # gRPC 协议定义（供其他语言生成客户端桩）
+├── Interception/      # 运行时驱动库与许可证（仅 Windows）
+├── proto/
+├── README.md
+├── LICENSE
+└── THIRD_PARTY_NOTICES
+```
+
+Linux 包**不包含** `Interception/`、`FakerInput_Setup_0.1.1_x64.msi` 或 `FakerInput/` 源码（均为 Windows-only）：
+
+```
+GoKeyMux-linux-amd64.zip / GoKeyMux-linux-arm64.zip
+├── GoKeyMux          # 已设置可执行位
+├── keycycle
+├── loadtest
+├── proto/             # gRPC 协议定义
+├── README.md
+├── LICENSE
+└── THIRD_PARTY_NOTICES
 ```
 
 > 提示：
 > - `GoKeyMux.exe` 与 `Interception/` 同级，是为了让 `winputWithInterception` 后端按可执行文件目录定位
 >   `Interception/library/x64/interception.dll`（386 版对应 `x86/`），解压后无需移动文件即可运行。
-> - `FakerInput_Setup_0.1.1_x64.msi` 为 x64 驱动，仅随 amd64 包分发。
+> - `FakerInput_Setup_0.1.1_x64.msi` 为 x64 驱动，仅随 Windows amd64 包分发。
+> - Linux 用户解压后可直接 `./GoKeyMux`；X11 需要 `/dev/uinput` 权限，Wayland 首次启动需要 Portal 授权。
 
 ## 项目结构
 
@@ -523,18 +617,29 @@ GoKeyMux-windows-386.zip
 .
 ├── main.go                        # 入口：加载配置、启动 engine/service、信号处理
 ├── config.json                    # 运行时配置（缺失时自动生成）
+├── build.ps1                      # Windows 构建脚本（注入版本信息）
+├── build.sh                       # Linux/macOS 构建脚本（注入版本信息）
 ├── internal/
 │   ├── config/config.go           # 配置结构与加载逻辑
 │   ├── input/
-│   │   ├── keyMap.go              # 统一按键映射表（makc / winput / FakerInput）
-│   │   ├── FakerInput.go          # FakerInput 虚拟 HID 设备实现
+│   │   ├── keyMap.go              # 可移植按键映射（makc + USB HID）
+│   │   ├── keymap_windows.go      # Windows 专用 Interception 扫描码映射
+│   │   ├── backend.go             # 平台无关的后端接口
+│   │   ├── backend_makc.go        # makc 后端适配器
+│   │   ├── backend_windows.go     # Windows：5 种后端构造
+│   │   ├── backend_notwindows.go  # Linux/其他：makc + noop
+│   │   ├── backend_fakerinput_windows.go
+│   │   ├── backend_winput_windows.go
+│   │   ├── makc_options_linux.go  # Linux：auto/uinput/xdgportal 选择
+│   │   ├── makc_options_windows.go
+│   │   ├── FakerInput.go          # FakerInput 虚拟 HID 设备（//go:build windows）
 │   │   ├── makcInput.go           # makc 后端
 │   │   ├── noopInput.go           # noop 空操作后端（压测用）
-│   │   ├── winputWithWindow.go    # winput 窗口消息后端
+│   │   ├── winputWithWindow.go    # winput 窗口消息后端（//go:build windows）
 │   │   ├── winputWithInterception.go
 │   │   └── *_test.go              # 键码/后端单测、集成测试、映射基准
 │   ├── engine/
-│   │   ├── engine.go              # 引擎：按 driveName 分发到具体后端
+│   │   ├── engine.go              # 引擎：队列、持有状态、统一调用 input.Backend
 │   │   ├── aliases.go             # 类型 / 驱动常量别名
 │   │   └── *_test.go              # 引擎单测、基准、集成与真实后端
 │   └── service/

@@ -146,13 +146,23 @@ func TestEngineConcurrentMouseKeyboardNoop(t *testing.T) {
 	}
 }
 
-func TestEngineMouseApplyUnsupportedDrive(t *testing.T) {
+// mouseUnsupportedBackend models a backend (such as the winput backends) that
+// implements keyboard injection but not mouse injection.
+type mouseUnsupportedBackend struct {
+	NoopDevice
+}
+
+func (mouseUnsupportedBackend) Name() string { return "mouse-unsupported" }
+
+func (mouseUnsupportedBackend) Mouse(context.Context, mouseEvent) error {
+	return errors.New("mouse not implemented")
+}
+
+func TestEngineMouseApplyUnsupportedBackend(t *testing.T) {
 	e := NewEngine()
-	for _, drive := range []DriveName{DriveWinputWithWindow, DriveWinputWithInterception} {
-		e.driveName = drive
-		if err := e.applyMouse(context.Background(), mouseEvent{Kind: mouseEventMoveRel, DX: 1, DY: 1}); err == nil {
-			t.Errorf("expected error for drive %s", drive)
-		}
+	e.driveClient = &mouseUnsupportedBackend{}
+	if err := e.applyMouse(context.Background(), mouseEvent{Kind: mouseEventMoveRel, DX: 1, DY: 1}); err == nil {
+		t.Fatal("expected error for a backend without mouse support")
 	}
 }
 

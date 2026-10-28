@@ -4,17 +4,11 @@ import (
 	"context"
 	"log/slog"
 	"slices"
-	"syscall"
 	"testing"
 	"time"
-	"unsafe"
 
 	"GoKeyMux/internal/config"
 )
-
-// kernel32 is used for high-resolution latency sampling in benchmarks. The
-// input package owns its own copy after the package split.
-var kernel32 = syscall.NewLazyDLL("kernel32.dll")
 
 // This file holds the shared plumbing for the benchmarks. All benchmarks in
 // this package run sequentially (none of them calls b.Parallel), because they
@@ -149,27 +143,7 @@ func reportPercentiles(b *testing.B, samples []time.Duration) {
 // result is otherwise unused.
 var benchSinkKey KeyCodes
 
-// Windows QueryPerformanceCounter is used for per-operation latency samples.
-// time.Now is not good enough here: on some Windows hosts (including RDP/VM
-// sessions) its granularity is ~0.5ms, so a microsecond-scale round trip is
-// either measured as 0 or as a full clock tick. QPC typically ticks at 10MHz,
-// giving ~100ns resolution.
-//
-// kernel32 is declared in winputWithInterception.go; the project is
-// Windows-only, so reusing it keeps the benchmark dependency-free.
-var (
-	procQueryPerformanceCounter   = kernel32.NewProc("QueryPerformanceCounter")
-	procQueryPerformanceFrequency = kernel32.NewProc("QueryPerformanceFrequency")
-)
-
-func benchQPCTicksPerSecond() int64 {
-	var freq int64
-	_, _, _ = procQueryPerformanceFrequency.Call(uintptr(unsafe.Pointer(&freq)))
-	return freq
-}
-
-func benchQPCNow() int64 {
-	var ticks int64
-	_, _, _ = procQueryPerformanceCounter.Call(uintptr(unsafe.Pointer(&ticks)))
-	return ticks
-}
+// benchQPCTicksPerSecond and benchQPCNow provide a high-resolution clock for
+// per-operation latency samples. The Windows implementation uses
+// QueryPerformanceCounter (time.Now is too coarse on some Windows hosts); other
+// platforms use time.Now.

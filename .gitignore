@@ -3,3 +3,6 @@ config.json
 notebook.txt
 go_build_GoKeyMux_cmd_keycycle.exe
 go_build_GoKeyMux_cmd_loadtest.exe
+/GoKeyMux
+/keycycle
+/loadtest

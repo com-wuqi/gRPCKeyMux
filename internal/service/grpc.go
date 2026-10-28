@@ -139,6 +139,7 @@ func (s *GoKeyMuxService) MouseService(stream pb.RpcKeyService_MouseServiceServe
 		case pb.MouseEvent_MOVE:
 			{
 				if err = s.engine.EngineMouseMove(stream.Context(), req.GetX(), req.GetY()); err != nil {
+					isAllDone = false
 					slog.Default().LogAttrs(
 						stream.Context(), slog.LevelError, "MouseEvent_MOVE failed",
 						slog.String("err", err.Error()),
@@ -148,6 +149,7 @@ func (s *GoKeyMuxService) MouseService(stream pb.RpcKeyService_MouseServiceServe
 		case pb.MouseEvent_ABS_MOVE:
 			{
 				if err = s.engine.EngineMouseMoveTo(stream.Context(), req.GetX(), req.GetY()); err != nil {
+					isAllDone = false
 					slog.Default().LogAttrs(
 						stream.Context(), slog.LevelError, "MouseEvent_ABS_MOVE failed",
 						slog.String("err", err.Error()),
@@ -157,6 +159,7 @@ func (s *GoKeyMuxService) MouseService(stream pb.RpcKeyService_MouseServiceServe
 		case pb.MouseEvent_SCROLL:
 			{
 				if err = s.engine.EngineMouseWheel(stream.Context(), req.GetScrollDelta()); err != nil {
+					isAllDone = false
 					slog.Default().LogAttrs(
 						stream.Context(), slog.LevelError, "MouseEvent_SCROLL failed",
 						slog.String("err", err.Error()),
@@ -166,6 +169,7 @@ func (s *GoKeyMuxService) MouseService(stream pb.RpcKeyService_MouseServiceServe
 		case pb.MouseEvent_LEFT_UP:
 			{
 				if err = s.engine.EngineMouseButtonUp(stream.Context(), input.MouseButtonLeft); err != nil {
+					isAllDone = false
 					slog.Default().LogAttrs(
 						stream.Context(), slog.LevelError, "MouseEvent_LEFT_UP failed",
 						slog.String("err", err.Error()),
@@ -175,6 +179,7 @@ func (s *GoKeyMuxService) MouseService(stream pb.RpcKeyService_MouseServiceServe
 		case pb.MouseEvent_LEFT_DOWN:
 			{
 				if err = s.engine.EngineMouseButtonDown(stream.Context(), input.MouseButtonLeft); err != nil {
+					isAllDone = false
 					slog.Default().LogAttrs(
 						stream.Context(), slog.LevelError, "MouseEvent_LEFT_DOWN failed",
 						slog.String("err", err.Error()),
@@ -184,6 +189,7 @@ func (s *GoKeyMuxService) MouseService(stream pb.RpcKeyService_MouseServiceServe
 		case pb.MouseEvent_RIGHT_UP:
 			{
 				if err = s.engine.EngineMouseButtonUp(stream.Context(), input.MouseButtonRight); err != nil {
+					isAllDone = false
 					slog.Default().LogAttrs(
 						stream.Context(), slog.LevelError, "MouseEvent_RIGHT_UP failed",
 						slog.String("err", err.Error()),
@@ -193,6 +199,7 @@ func (s *GoKeyMuxService) MouseService(stream pb.RpcKeyService_MouseServiceServe
 		case pb.MouseEvent_RIGHT_DOWN:
 			{
 				if err = s.engine.EngineMouseButtonDown(stream.Context(), input.MouseButtonRight); err != nil {
+					isAllDone = false
 					slog.Default().LogAttrs(
 						stream.Context(), slog.LevelError, "MouseEvent_RIGHT_DOWN failed",
 						slog.String("err", err.Error()),
@@ -202,6 +209,7 @@ func (s *GoKeyMuxService) MouseService(stream pb.RpcKeyService_MouseServiceServe
 		case pb.MouseEvent_MIDDLE_UP:
 			{
 				if err = s.engine.EngineMouseButtonUp(stream.Context(), input.MouseButtonMiddle); err != nil {
+					isAllDone = false
 					slog.Default().LogAttrs(
 						stream.Context(), slog.LevelError, "MouseEvent_MIDDLE_UP failed",
 						slog.String("err", err.Error()),
@@ -211,6 +219,7 @@ func (s *GoKeyMuxService) MouseService(stream pb.RpcKeyService_MouseServiceServe
 		case pb.MouseEvent_MIDDLE_DOWN:
 			{
 				if err = s.engine.EngineMouseButtonDown(stream.Context(), input.MouseButtonMiddle); err != nil {
+					isAllDone = false
 					slog.Default().LogAttrs(
 						stream.Context(), slog.LevelError, "MouseEvent_MIDDLE_DOWN failed",
 						slog.String("err", err.Error()),

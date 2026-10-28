@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
+  build-windows:
     runs-on: windows-latest
     strategy:
       matrix:
@@ -47,8 +47,10 @@ jobs:
 
       - name: Bundle runtime deps
         run: |
+          # Windows-only runtime files. Do not add these to the Linux package.
           Copy-Item -Recurse Interception dist/
           Copy-Item -Recurse proto dist/
+          Copy-Item -Path LICENSE,THIRD_PARTY_NOTICES,README.md -Destination dist/
           if ('${{ matrix.arch }}' -eq 'amd64') { Copy-Item FakerInput_Setup_0.1.1_x64.msi dist/ }
 
       - name: Zip
@@ -60,8 +62,57 @@ jobs:
           name: GoKeyMux-windows-${{ matrix.arch }}
           path: GoKeyMux-windows-${{ matrix.arch }}.zip
 
+  build-linux:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [ amd64, arm64 ]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build
+        env:
+          GOOS: linux
+          GOARCH: ${{ matrix.arch }}
+          CGO_ENABLED: '0'
+        run: |
+          Version=$(git describe --tags --always --dirty 2>/dev/null || printf 'dev')
+          Commit=$(git rev-parse --short HEAD 2>/dev/null || printf 'unknown')
+          BuildTime=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+          LdFlags="-s -w -X GoKeyMux/version.Version=$Version -X GoKeyMux/version.Commit=$Commit -X GoKeyMux/version.BuildTime=$BuildTime"
+          mkdir -p dist
+          go build -trimpath -ldflags "$LdFlags" -o dist/GoKeyMux .
+          go build -trimpath -ldflags "-s -w" -o dist/keycycle ./cmd/keycycle
+          go build -trimpath -ldflags "-s -w" -o dist/loadtest ./cmd/loadtest
+
+      - name: Bundle runtime deps
+        run: |
+          # Linux package contains only portable files: no Interception driver
+          # and no FakerInput MSI (both are Windows-only).
+          cp -r proto dist/
+          cp LICENSE THIRD_PARTY_NOTICES README.md dist/
+          chmod +x dist/GoKeyMux dist/keycycle dist/loadtest
+
+      - name: Zip
+        run: |
+          cd dist
+          zip -r "../GoKeyMux-linux-${{ matrix.arch }}.zip" .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: GoKeyMux-linux-${{ matrix.arch }}
+          path: GoKeyMux-linux-${{ matrix.arch }}.zip
+
   release:
-    needs: build
+    needs: [ build-windows, build-linux ]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:

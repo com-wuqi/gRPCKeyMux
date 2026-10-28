@@ -37,19 +37,22 @@ func TestMakcEngineIntegration(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = e.CloseEngine() })
 
-	client, ok := e.driveClient.(*makc.Client)
+	backend, ok := e.driveClient.(*input.MakcBackend)
 	if !ok {
-		t.Fatalf("driveClient is not *makc.Client: %T", e.driveClient)
+		t.Fatalf("driveClient is not *input.MakcBackend: %T", e.driveClient)
 	}
+	client := backend.Client
 	t.Logf("keyboard backend=%s mouse backend=%s",
 		client.Keyboard.InjectionBackend(), client.Mouse.InjectionBackend())
 
-	// Screen size must be cached at startup.
+	// Screen size is cached at startup when the platform exposes it (X11 on
+	// Linux); Wayland has no X11 display, so absolute movement is unavailable.
 	screenW, screenH := input.MakcScreenSize()
 	if screenW <= 0 || screenH <= 0 {
-		t.Fatalf("screen size not cached: %dx%d", screenW, screenH)
+		t.Logf("screen size not available (Wayland?): %dx%d; skipping absolute move", screenW, screenH)
+	} else {
+		t.Logf("cached screen size: %dx%d", screenW, screenH)
 	}
-	t.Logf("cached screen size: %dx%d", screenW, screenH)
 
 	// Keyboard must still dispatch through the engine.
 	kc, ok := input.KeyCodesFromName("shift")
@@ -67,8 +70,10 @@ func TestMakcEngineIntegration(t *testing.T) {
 	if err := e.EngineMouseMove(ctx, 10, 0); err != nil {
 		t.Fatalf("engine mouse move: %v", err)
 	}
-	if err := e.EngineMouseMoveTo(ctx, 5000, 5000); err != nil {
-		t.Fatalf("engine mouse moveTo: %v", err)
+	if screenW > 0 && screenH > 0 {
+		if err := e.EngineMouseMoveTo(ctx, 5000, 5000); err != nil {
+			t.Fatalf("engine mouse moveTo: %v", err)
+		}
 	}
 	if err := e.EngineMouseButtonDown(ctx, MouseButtonLeft); err != nil {
 		t.Fatalf("engine mouse button down: %v", err)
@@ -205,7 +210,7 @@ func TestMakcReleaseMatchesHeldKeyIntegration(t *testing.T) {
 	// StartEngine, which would open its own auto-selected client.
 	e := NewEngine()
 	e.driveName = DriveMakc
-	e.driveClient = client
+	e.driveClient = &input.MakcBackend{Client: client}
 	e.wg.Add(2)
 	go e.run()
 	go e.runMouse()

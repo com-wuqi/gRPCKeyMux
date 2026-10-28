@@ -10,22 +10,33 @@ import (
 
 // makcScreenSize caches the primary screen size captured at startup. It is used
 // to scale normalized 0..10000 absolute mouse coordinates into pixels. It is
-// written once in MakcInputInit (before the engine workers start) and read only
-// from the engine mouse worker goroutine, so no further synchronization is
-// required.
+// written by MakcInputInit before the engine workers start and, if the startup
+// query failed (e.g. Wayland), by the mouse worker on the first successful
+// query. After startup only the mouse worker touches it, so no further
+// synchronization is required.
 var makcScreenSize makc.Point
 
 func MakcInputInit() (*makc.Client, error) {
 	slog.Debug("MakcInputInit")
-	client, err := makc.Open()
+
+	plan := makcOpenPlanForPlatform()
+	client, err := makc.Open(plan.primary...)
+	if err != nil && len(plan.fallback) > 0 {
+		slog.Warn("makc primary backend failed, trying fallback", "err", err)
+		client, err = makc.Open(plan.fallback...)
+	}
 	if err != nil {
 		return nil, err
 	}
+	logMakcBackends(client)
+
 	if size, err := client.Mouse.ScreenSize(context.Background()); err == nil {
 		makcScreenSize = size
 		slog.Debug("Makc ScreenSize: ", "X", size.X, "Y", size.Y)
 	} else {
-		slog.Warn("MakcInputInit: query screen size failed", "err", err)
+		// Wayland has no X11 display, so absolute movement is unavailable; the
+		// engine reports that explicitly when ABS_MOVE is requested.
+		slog.Warn("MakcInputInit: query screen size failed (absolute mouse movement unavailable)", "err", err)
 	}
 	return client, nil
 }
@@ -99,8 +110,9 @@ func MakcInputMouseMoveTo(client *makc.Client, x, y int32, ctx context.Context) 
 		var err error
 		size, err = client.Mouse.ScreenSize(ctx)
 		if err != nil {
-			return err
+			return fmt.Errorf("absolute mouse movement is unavailable: screen size query failed: %w", err)
 		}
+		makcScreenSize = size
 	}
 	return client.Mouse.MoveTo(ctx, MakcAbsCoordinate(x, size.X), MakcAbsCoordinate(y, size.Y))
 }

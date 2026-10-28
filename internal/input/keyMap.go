@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/aiwaki/makc"
-	"github.com/rpdg/winput"
 )
 
 // Modifier key flags for FakerInputKeyboardReport.ShiftKeyFlags.
@@ -107,109 +106,111 @@ const (
 	fakerInputKeyNumLock     byte = 0x53
 )
 
-// KeyCodes holds one logical key in all three encodings used across this
-// codebase: makc.Key (Windows virtual-key code), winput.Key (Interception scan
-// code), and FakerInput (USB HID usage code). Modifiers carries the modifier
-// flags (e.g. left shift) needed to produce the mapped rune.
+// KeyCodes holds one logical key in the two portable encodings used across the
+// codebase: makc.Key (logical key; Windows virtual-key code, mapped to evdev by
+// makc on Linux) and FakerInput (USB HID usage code). Modifiers carries the
+// modifier flags (e.g. left shift) needed to produce the mapped rune.
+//
+// The Windows-only Interception scan code is derived from Makc by
+// winputKey in keymap_windows.go, so it is not stored here.
 type KeyCodes struct {
 	Makc       makc.Key
-	Winput     winput.Key
 	FakerInput byte
 	Modifiers  byte
 }
 
 // fakerInputKeyTable is the single source of truth for logical keys (no
-// modifiers), pairing all three encodings. It is indexed by both makc.Key and
-// winput.Key through keyByMakc / keyByWinput below.
+// modifiers), pairing the portable encodings. It is indexed by makc.Key through
+// keyByMakc below; the Windows scan-code table is derived from the same keys.
 var fakerInputKeyTable = []KeyCodes{
 	// Letters
-	{makc.KeyA, winput.KeyA, fakerInputKeyA, 0},
-	{makc.KeyB, winput.KeyB, fakerInputKeyB, 0},
-	{makc.KeyC, winput.KeyC, fakerInputKeyC, 0},
-	{makc.KeyD, winput.KeyD, fakerInputKeyD, 0},
-	{makc.KeyE, winput.KeyE, fakerInputKeyE, 0},
-	{makc.KeyF, winput.KeyF, fakerInputKeyF, 0},
-	{makc.KeyG, winput.KeyG, fakerInputKeyG, 0},
-	{makc.KeyH, winput.KeyH, fakerInputKeyH, 0},
-	{makc.KeyI, winput.KeyI, fakerInputKeyI, 0},
-	{makc.KeyJ, winput.KeyJ, fakerInputKeyJ, 0},
-	{makc.KeyK, winput.KeyK, fakerInputKeyK, 0},
-	{makc.KeyL, winput.KeyL, fakerInputKeyL, 0},
-	{makc.KeyM, winput.KeyM, fakerInputKeyM, 0},
-	{makc.KeyN, winput.KeyN, fakerInputKeyN, 0},
-	{makc.KeyO, winput.KeyO, fakerInputKeyO, 0},
-	{makc.KeyP, winput.KeyP, fakerInputKeyP, 0},
-	{makc.KeyQ, winput.KeyQ, fakerInputKeyQ, 0},
-	{makc.KeyR, winput.KeyR, fakerInputKeyR, 0},
-	{makc.KeyS, winput.KeyS, fakerInputKeyS, 0},
-	{makc.KeyT, winput.KeyT, fakerInputKeyT, 0},
-	{makc.KeyU, winput.KeyU, fakerInputKeyU, 0},
-	{makc.KeyV, winput.KeyV, fakerInputKeyV, 0},
-	{makc.KeyW, winput.KeyW, fakerInputKeyW, 0},
-	{makc.KeyX, winput.KeyX, fakerInputKeyX, 0},
-	{makc.KeyY, winput.KeyY, fakerInputKeyY, 0},
-	{makc.KeyZ, winput.KeyZ, fakerInputKeyZ, 0},
+	{makc.KeyA, fakerInputKeyA, 0},
+	{makc.KeyB, fakerInputKeyB, 0},
+	{makc.KeyC, fakerInputKeyC, 0},
+	{makc.KeyD, fakerInputKeyD, 0},
+	{makc.KeyE, fakerInputKeyE, 0},
+	{makc.KeyF, fakerInputKeyF, 0},
+	{makc.KeyG, fakerInputKeyG, 0},
+	{makc.KeyH, fakerInputKeyH, 0},
+	{makc.KeyI, fakerInputKeyI, 0},
+	{makc.KeyJ, fakerInputKeyJ, 0},
+	{makc.KeyK, fakerInputKeyK, 0},
+	{makc.KeyL, fakerInputKeyL, 0},
+	{makc.KeyM, fakerInputKeyM, 0},
+	{makc.KeyN, fakerInputKeyN, 0},
+	{makc.KeyO, fakerInputKeyO, 0},
+	{makc.KeyP, fakerInputKeyP, 0},
+	{makc.KeyQ, fakerInputKeyQ, 0},
+	{makc.KeyR, fakerInputKeyR, 0},
+	{makc.KeyS, fakerInputKeyS, 0},
+	{makc.KeyT, fakerInputKeyT, 0},
+	{makc.KeyU, fakerInputKeyU, 0},
+	{makc.KeyV, fakerInputKeyV, 0},
+	{makc.KeyW, fakerInputKeyW, 0},
+	{makc.KeyX, fakerInputKeyX, 0},
+	{makc.KeyY, fakerInputKeyY, 0},
+	{makc.KeyZ, fakerInputKeyZ, 0},
 
 	// Digits
-	{makc.Key0, winput.Key0, fakerInputKey0, 0},
-	{makc.Key1, winput.Key1, fakerInputKey1, 0},
-	{makc.Key2, winput.Key2, fakerInputKey2, 0},
-	{makc.Key3, winput.Key3, fakerInputKey3, 0},
-	{makc.Key4, winput.Key4, fakerInputKey4, 0},
-	{makc.Key5, winput.Key5, fakerInputKey5, 0},
-	{makc.Key6, winput.Key6, fakerInputKey6, 0},
-	{makc.Key7, winput.Key7, fakerInputKey7, 0},
-	{makc.Key8, winput.Key8, fakerInputKey8, 0},
-	{makc.Key9, winput.Key9, fakerInputKey9, 0},
+	{makc.Key0, fakerInputKey0, 0},
+	{makc.Key1, fakerInputKey1, 0},
+	{makc.Key2, fakerInputKey2, 0},
+	{makc.Key3, fakerInputKey3, 0},
+	{makc.Key4, fakerInputKey4, 0},
+	{makc.Key5, fakerInputKey5, 0},
+	{makc.Key6, fakerInputKey6, 0},
+	{makc.Key7, fakerInputKey7, 0},
+	{makc.Key8, fakerInputKey8, 0},
+	{makc.Key9, fakerInputKey9, 0},
 
 	// Whitespace and common control keys
-	{makc.KeyEnter, winput.KeyEnter, fakerInputKeyEnter, 0},
-	{makc.KeyEscape, winput.KeyEsc, fakerInputKeyEscape, 0},
-	{makc.KeyBackspace, winput.KeyBkSp, fakerInputKeyBackspace, 0},
-	{makc.KeyTab, winput.KeyTab, fakerInputKeyTab, 0},
-	{makc.KeySpace, winput.KeySpace, fakerInputKeySpace, 0},
-	{makc.KeyCapsLock, winput.KeyCaps, fakerInputKeyCapsLock, 0},
+	{makc.KeyEnter, fakerInputKeyEnter, 0},
+	{makc.KeyEscape, fakerInputKeyEscape, 0},
+	{makc.KeyBackspace, fakerInputKeyBackspace, 0},
+	{makc.KeyTab, fakerInputKeyTab, 0},
+	{makc.KeySpace, fakerInputKeySpace, 0},
+	{makc.KeyCapsLock, fakerInputKeyCapsLock, 0},
 
 	// Symbols
-	{makc.KeyMinus, winput.KeyMinus, fakerInputKeyMinus, 0},
-	{makc.KeyEquals, winput.KeyEqual, fakerInputKeyEqual, 0},
-	{makc.KeyLeftSquareBracket, winput.KeyLBr, fakerInputKeyLBracket, 0},
-	{makc.KeyRightSquareBracket, winput.KeyRBr, fakerInputKeyRBracket, 0},
-	{makc.KeyBackslash, winput.KeyBackslash, fakerInputKeyBackslash, 0},
-	{makc.KeySemicolon, winput.KeySemi, fakerInputKeySemicolon, 0},
-	{makc.KeySingleQuote, winput.KeyQuot, fakerInputKeyQuote, 0},
-	{makc.KeyBackQuote, winput.KeyTick, fakerInputKeyBackquote, 0},
-	{makc.KeyComma, winput.KeyComma, fakerInputKeyComma, 0},
-	{makc.KeyDot, winput.KeyDot, fakerInputKeyPeriod, 0},
-	{makc.KeySlash, winput.KeySlash, fakerInputKeySlash, 0},
+	{makc.KeyMinus, fakerInputKeyMinus, 0},
+	{makc.KeyEquals, fakerInputKeyEqual, 0},
+	{makc.KeyLeftSquareBracket, fakerInputKeyLBracket, 0},
+	{makc.KeyRightSquareBracket, fakerInputKeyRBracket, 0},
+	{makc.KeyBackslash, fakerInputKeyBackslash, 0},
+	{makc.KeySemicolon, fakerInputKeySemicolon, 0},
+	{makc.KeySingleQuote, fakerInputKeyQuote, 0},
+	{makc.KeyBackQuote, fakerInputKeyBackquote, 0},
+	{makc.KeyComma, fakerInputKeyComma, 0},
+	{makc.KeyDot, fakerInputKeyPeriod, 0},
+	{makc.KeySlash, fakerInputKeySlash, 0},
 
 	// Function keys
-	{makc.KeyF1, winput.KeyF1, fakerInputKeyF1, 0},
-	{makc.KeyF2, winput.KeyF2, fakerInputKeyF2, 0},
-	{makc.KeyF3, winput.KeyF3, fakerInputKeyF3, 0},
-	{makc.KeyF4, winput.KeyF4, fakerInputKeyF4, 0},
-	{makc.KeyF5, winput.KeyF5, fakerInputKeyF5, 0},
-	{makc.KeyF6, winput.KeyF6, fakerInputKeyF6, 0},
-	{makc.KeyF7, winput.KeyF7, fakerInputKeyF7, 0},
-	{makc.KeyF8, winput.KeyF8, fakerInputKeyF8, 0},
-	{makc.KeyF9, winput.KeyF9, fakerInputKeyF9, 0},
-	{makc.KeyF10, winput.KeyF10, fakerInputKeyF10, 0},
-	{makc.KeyF11, winput.KeyF11, fakerInputKeyF11, 0},
-	{makc.KeyF12, winput.KeyF12, fakerInputKeyF12, 0},
+	{makc.KeyF1, fakerInputKeyF1, 0},
+	{makc.KeyF2, fakerInputKeyF2, 0},
+	{makc.KeyF3, fakerInputKeyF3, 0},
+	{makc.KeyF4, fakerInputKeyF4, 0},
+	{makc.KeyF5, fakerInputKeyF5, 0},
+	{makc.KeyF6, fakerInputKeyF6, 0},
+	{makc.KeyF7, fakerInputKeyF7, 0},
+	{makc.KeyF8, fakerInputKeyF8, 0},
+	{makc.KeyF9, fakerInputKeyF9, 0},
+	{makc.KeyF10, fakerInputKeyF10, 0},
+	{makc.KeyF11, fakerInputKeyF11, 0},
+	{makc.KeyF12, fakerInputKeyF12, 0},
 
 	// Navigation and editing keys
-	{makc.KeyScrollLock, winput.KeyScroll, fakerInputKeyScrollLock, 0},
-	{makc.KeyInsert, winput.KeyInsert, fakerInputKeyInsert, 0},
-	{makc.KeyHome, winput.KeyHome, fakerInputKeyHome, 0},
-	{makc.KeyPageUp, winput.KeyPageUp, fakerInputKeyPageUp, 0},
-	{makc.KeyDelete, winput.KeyDelete, fakerInputKeyDelete, 0},
-	{makc.KeyEnd, winput.KeyEnd, fakerInputKeyEnd, 0},
-	{makc.KeyPageDown, winput.KeyPageDown, fakerInputKeyPageDown, 0},
-	{makc.KeyRight, winput.KeyRight, fakerInputKeyRightArrow, 0},
-	{makc.KeyLeft, winput.KeyLeft, fakerInputKeyLeftArrow, 0},
-	{makc.KeyDown, winput.KeyArrowDown, fakerInputKeyDownArrow, 0},
-	{makc.KeyUp, winput.KeyArrowUp, fakerInputKeyUpArrow, 0},
-	{makc.KeyNumLock, winput.KeyNumLock, fakerInputKeyNumLock, 0},
+	{makc.KeyScrollLock, fakerInputKeyScrollLock, 0},
+	{makc.KeyInsert, fakerInputKeyInsert, 0},
+	{makc.KeyHome, fakerInputKeyHome, 0},
+	{makc.KeyPageUp, fakerInputKeyPageUp, 0},
+	{makc.KeyDelete, fakerInputKeyDelete, 0},
+	{makc.KeyEnd, fakerInputKeyEnd, 0},
+	{makc.KeyPageDown, fakerInputKeyPageDown, 0},
+	{makc.KeyRight, fakerInputKeyRightArrow, 0},
+	{makc.KeyLeft, fakerInputKeyLeftArrow, 0},
+	{makc.KeyDown, fakerInputKeyDownArrow, 0},
+	{makc.KeyUp, fakerInputKeyUpArrow, 0},
+	{makc.KeyNumLock, fakerInputKeyNumLock, 0},
 }
 
 // keyByMakc indexes fakerInputKeyTable by makc.Key (Windows virtual-key code).
@@ -221,141 +222,125 @@ var keyByMakc = func() map[makc.Key]KeyCodes {
 	return m
 }()
 
-// keyByWinput indexes fakerInputKeyTable by winput.Key (Interception scan code).
-var keyByWinput = func() map[winput.Key]KeyCodes {
-	m := make(map[winput.Key]KeyCodes, len(fakerInputKeyTable))
-	for _, kc := range fakerInputKeyTable {
-		m[kc.Winput] = kc
-	}
-	return m
-}()
-
 // keyByRune maps a printable ASCII rune (or control rune) to its KeyCodes,
 // including the modifier flags required for shifted variants.
 var keyByRune = map[rune]KeyCodes{
-	'a': {makc.KeyA, winput.KeyA, fakerInputKeyA, 0},
-	'A': {makc.KeyA, winput.KeyA, fakerInputKeyA, ModLShift},
-	'b': {makc.KeyB, winput.KeyB, fakerInputKeyB, 0},
-	'B': {makc.KeyB, winput.KeyB, fakerInputKeyB, ModLShift},
-	'c': {makc.KeyC, winput.KeyC, fakerInputKeyC, 0},
-	'C': {makc.KeyC, winput.KeyC, fakerInputKeyC, ModLShift},
-	'd': {makc.KeyD, winput.KeyD, fakerInputKeyD, 0},
-	'D': {makc.KeyD, winput.KeyD, fakerInputKeyD, ModLShift},
-	'e': {makc.KeyE, winput.KeyE, fakerInputKeyE, 0},
-	'E': {makc.KeyE, winput.KeyE, fakerInputKeyE, ModLShift},
-	'f': {makc.KeyF, winput.KeyF, fakerInputKeyF, 0},
-	'F': {makc.KeyF, winput.KeyF, fakerInputKeyF, ModLShift},
-	'g': {makc.KeyG, winput.KeyG, fakerInputKeyG, 0},
-	'G': {makc.KeyG, winput.KeyG, fakerInputKeyG, ModLShift},
-	'h': {makc.KeyH, winput.KeyH, fakerInputKeyH, 0},
-	'H': {makc.KeyH, winput.KeyH, fakerInputKeyH, ModLShift},
-	'i': {makc.KeyI, winput.KeyI, fakerInputKeyI, 0},
-	'I': {makc.KeyI, winput.KeyI, fakerInputKeyI, ModLShift},
-	'j': {makc.KeyJ, winput.KeyJ, fakerInputKeyJ, 0},
-	'J': {makc.KeyJ, winput.KeyJ, fakerInputKeyJ, ModLShift},
-	'k': {makc.KeyK, winput.KeyK, fakerInputKeyK, 0},
-	'K': {makc.KeyK, winput.KeyK, fakerInputKeyK, ModLShift},
-	'l': {makc.KeyL, winput.KeyL, fakerInputKeyL, 0},
-	'L': {makc.KeyL, winput.KeyL, fakerInputKeyL, ModLShift},
-	'm': {makc.KeyM, winput.KeyM, fakerInputKeyM, 0},
-	'M': {makc.KeyM, winput.KeyM, fakerInputKeyM, ModLShift},
-	'n': {makc.KeyN, winput.KeyN, fakerInputKeyN, 0},
-	'N': {makc.KeyN, winput.KeyN, fakerInputKeyN, ModLShift},
-	'o': {makc.KeyO, winput.KeyO, fakerInputKeyO, 0},
-	'O': {makc.KeyO, winput.KeyO, fakerInputKeyO, ModLShift},
-	'p': {makc.KeyP, winput.KeyP, fakerInputKeyP, 0},
-	'P': {makc.KeyP, winput.KeyP, fakerInputKeyP, ModLShift},
-	'q': {makc.KeyQ, winput.KeyQ, fakerInputKeyQ, 0},
-	'Q': {makc.KeyQ, winput.KeyQ, fakerInputKeyQ, ModLShift},
-	'r': {makc.KeyR, winput.KeyR, fakerInputKeyR, 0},
-	'R': {makc.KeyR, winput.KeyR, fakerInputKeyR, ModLShift},
-	's': {makc.KeyS, winput.KeyS, fakerInputKeyS, 0},
-	'S': {makc.KeyS, winput.KeyS, fakerInputKeyS, ModLShift},
-	't': {makc.KeyT, winput.KeyT, fakerInputKeyT, 0},
-	'T': {makc.KeyT, winput.KeyT, fakerInputKeyT, ModLShift},
-	'u': {makc.KeyU, winput.KeyU, fakerInputKeyU, 0},
-	'U': {makc.KeyU, winput.KeyU, fakerInputKeyU, ModLShift},
-	'v': {makc.KeyV, winput.KeyV, fakerInputKeyV, 0},
-	'V': {makc.KeyV, winput.KeyV, fakerInputKeyV, ModLShift},
-	'w': {makc.KeyW, winput.KeyW, fakerInputKeyW, 0},
-	'W': {makc.KeyW, winput.KeyW, fakerInputKeyW, ModLShift},
-	'x': {makc.KeyX, winput.KeyX, fakerInputKeyX, 0},
-	'X': {makc.KeyX, winput.KeyX, fakerInputKeyX, ModLShift},
-	'y': {makc.KeyY, winput.KeyY, fakerInputKeyY, 0},
-	'Y': {makc.KeyY, winput.KeyY, fakerInputKeyY, ModLShift},
-	'z': {makc.KeyZ, winput.KeyZ, fakerInputKeyZ, 0},
-	'Z': {makc.KeyZ, winput.KeyZ, fakerInputKeyZ, ModLShift},
+	'a': {makc.KeyA, fakerInputKeyA, 0},
+	'A': {makc.KeyA, fakerInputKeyA, ModLShift},
+	'b': {makc.KeyB, fakerInputKeyB, 0},
+	'B': {makc.KeyB, fakerInputKeyB, ModLShift},
+	'c': {makc.KeyC, fakerInputKeyC, 0},
+	'C': {makc.KeyC, fakerInputKeyC, ModLShift},
+	'd': {makc.KeyD, fakerInputKeyD, 0},
+	'D': {makc.KeyD, fakerInputKeyD, ModLShift},
+	'e': {makc.KeyE, fakerInputKeyE, 0},
+	'E': {makc.KeyE, fakerInputKeyE, ModLShift},
+	'f': {makc.KeyF, fakerInputKeyF, 0},
+	'F': {makc.KeyF, fakerInputKeyF, ModLShift},
+	'g': {makc.KeyG, fakerInputKeyG, 0},
+	'G': {makc.KeyG, fakerInputKeyG, ModLShift},
+	'h': {makc.KeyH, fakerInputKeyH, 0},
+	'H': {makc.KeyH, fakerInputKeyH, ModLShift},
+	'i': {makc.KeyI, fakerInputKeyI, 0},
+	'I': {makc.KeyI, fakerInputKeyI, ModLShift},
+	'j': {makc.KeyJ, fakerInputKeyJ, 0},
+	'J': {makc.KeyJ, fakerInputKeyJ, ModLShift},
+	'k': {makc.KeyK, fakerInputKeyK, 0},
+	'K': {makc.KeyK, fakerInputKeyK, ModLShift},
+	'l': {makc.KeyL, fakerInputKeyL, 0},
+	'L': {makc.KeyL, fakerInputKeyL, ModLShift},
+	'm': {makc.KeyM, fakerInputKeyM, 0},
+	'M': {makc.KeyM, fakerInputKeyM, ModLShift},
+	'n': {makc.KeyN, fakerInputKeyN, 0},
+	'N': {makc.KeyN, fakerInputKeyN, ModLShift},
+	'o': {makc.KeyO, fakerInputKeyO, 0},
+	'O': {makc.KeyO, fakerInputKeyO, ModLShift},
+	'p': {makc.KeyP, fakerInputKeyP, 0},
+	'P': {makc.KeyP, fakerInputKeyP, ModLShift},
+	'q': {makc.KeyQ, fakerInputKeyQ, 0},
+	'Q': {makc.KeyQ, fakerInputKeyQ, ModLShift},
+	'r': {makc.KeyR, fakerInputKeyR, 0},
+	'R': {makc.KeyR, fakerInputKeyR, ModLShift},
+	's': {makc.KeyS, fakerInputKeyS, 0},
+	'S': {makc.KeyS, fakerInputKeyS, ModLShift},
+	't': {makc.KeyT, fakerInputKeyT, 0},
+	'T': {makc.KeyT, fakerInputKeyT, ModLShift},
+	'u': {makc.KeyU, fakerInputKeyU, 0},
+	'U': {makc.KeyU, fakerInputKeyU, ModLShift},
+	'v': {makc.KeyV, fakerInputKeyV, 0},
+	'V': {makc.KeyV, fakerInputKeyV, ModLShift},
+	'w': {makc.KeyW, fakerInputKeyW, 0},
+	'W': {makc.KeyW, fakerInputKeyW, ModLShift},
+	'x': {makc.KeyX, fakerInputKeyX, 0},
+	'X': {makc.KeyX, fakerInputKeyX, ModLShift},
+	'y': {makc.KeyY, fakerInputKeyY, 0},
+	'Y': {makc.KeyY, fakerInputKeyY, ModLShift},
+	'z': {makc.KeyZ, fakerInputKeyZ, 0},
+	'Z': {makc.KeyZ, fakerInputKeyZ, ModLShift},
 
-	'0': {makc.Key0, winput.Key0, fakerInputKey0, 0},
-	')': {makc.Key0, winput.Key0, fakerInputKey0, ModLShift},
-	'1': {makc.Key1, winput.Key1, fakerInputKey1, 0},
-	'!': {makc.Key1, winput.Key1, fakerInputKey1, ModLShift},
-	'2': {makc.Key2, winput.Key2, fakerInputKey2, 0},
-	'@': {makc.Key2, winput.Key2, fakerInputKey2, ModLShift},
-	'3': {makc.Key3, winput.Key3, fakerInputKey3, 0},
-	'#': {makc.Key3, winput.Key3, fakerInputKey3, ModLShift},
-	'4': {makc.Key4, winput.Key4, fakerInputKey4, 0},
-	'$': {makc.Key4, winput.Key4, fakerInputKey4, ModLShift},
-	'5': {makc.Key5, winput.Key5, fakerInputKey5, 0},
-	'%': {makc.Key5, winput.Key5, fakerInputKey5, ModLShift},
-	'6': {makc.Key6, winput.Key6, fakerInputKey6, 0},
-	'^': {makc.Key6, winput.Key6, fakerInputKey6, ModLShift},
-	'7': {makc.Key7, winput.Key7, fakerInputKey7, 0},
-	'&': {makc.Key7, winput.Key7, fakerInputKey7, ModLShift},
-	'8': {makc.Key8, winput.Key8, fakerInputKey8, 0},
-	'*': {makc.Key8, winput.Key8, fakerInputKey8, ModLShift},
-	'9': {makc.Key9, winput.Key9, fakerInputKey9, 0},
-	'(': {makc.Key9, winput.Key9, fakerInputKey9, ModLShift},
+	'0': {makc.Key0, fakerInputKey0, 0},
+	')': {makc.Key0, fakerInputKey0, ModLShift},
+	'1': {makc.Key1, fakerInputKey1, 0},
+	'!': {makc.Key1, fakerInputKey1, ModLShift},
+	'2': {makc.Key2, fakerInputKey2, 0},
+	'@': {makc.Key2, fakerInputKey2, ModLShift},
+	'3': {makc.Key3, fakerInputKey3, 0},
+	'#': {makc.Key3, fakerInputKey3, ModLShift},
+	'4': {makc.Key4, fakerInputKey4, 0},
+	'$': {makc.Key4, fakerInputKey4, ModLShift},
+	'5': {makc.Key5, fakerInputKey5, 0},
+	'%': {makc.Key5, fakerInputKey5, ModLShift},
+	'6': {makc.Key6, fakerInputKey6, 0},
+	'^': {makc.Key6, fakerInputKey6, ModLShift},
+	'7': {makc.Key7, fakerInputKey7, 0},
+	'&': {makc.Key7, fakerInputKey7, ModLShift},
+	'8': {makc.Key8, fakerInputKey8, 0},
+	'*': {makc.Key8, fakerInputKey8, ModLShift},
+	'9': {makc.Key9, fakerInputKey9, 0},
+	'(': {makc.Key9, fakerInputKey9, ModLShift},
 
-	'`':  {makc.KeyBackQuote, winput.KeyTick, fakerInputKeyBackquote, 0},
-	'~':  {makc.KeyBackQuote, winput.KeyTick, fakerInputKeyBackquote, ModLShift},
-	'-':  {makc.KeyMinus, winput.KeyMinus, fakerInputKeyMinus, 0},
-	'_':  {makc.KeyMinus, winput.KeyMinus, fakerInputKeyMinus, ModLShift},
-	'=':  {makc.KeyEquals, winput.KeyEqual, fakerInputKeyEqual, 0},
-	'+':  {makc.KeyEquals, winput.KeyEqual, fakerInputKeyEqual, ModLShift},
-	'[':  {makc.KeyLeftSquareBracket, winput.KeyLBr, fakerInputKeyLBracket, 0},
-	'{':  {makc.KeyLeftSquareBracket, winput.KeyLBr, fakerInputKeyLBracket, ModLShift},
-	']':  {makc.KeyRightSquareBracket, winput.KeyRBr, fakerInputKeyRBracket, 0},
-	'}':  {makc.KeyRightSquareBracket, winput.KeyRBr, fakerInputKeyRBracket, ModLShift},
-	'\\': {makc.KeyBackslash, winput.KeyBackslash, fakerInputKeyBackslash, 0},
-	'|':  {makc.KeyBackslash, winput.KeyBackslash, fakerInputKeyBackslash, ModLShift},
-	';':  {makc.KeySemicolon, winput.KeySemi, fakerInputKeySemicolon, 0},
-	':':  {makc.KeySemicolon, winput.KeySemi, fakerInputKeySemicolon, ModLShift},
-	'\'': {makc.KeySingleQuote, winput.KeyQuot, fakerInputKeyQuote, 0},
-	'"':  {makc.KeySingleQuote, winput.KeyQuot, fakerInputKeyQuote, ModLShift},
-	',':  {makc.KeyComma, winput.KeyComma, fakerInputKeyComma, 0},
-	'<':  {makc.KeyComma, winput.KeyComma, fakerInputKeyComma, ModLShift},
-	'.':  {makc.KeyDot, winput.KeyDot, fakerInputKeyPeriod, 0},
-	'>':  {makc.KeyDot, winput.KeyDot, fakerInputKeyPeriod, ModLShift},
-	'/':  {makc.KeySlash, winput.KeySlash, fakerInputKeySlash, 0},
-	'?':  {makc.KeySlash, winput.KeySlash, fakerInputKeySlash, ModLShift},
+	'`':  {makc.KeyBackQuote, fakerInputKeyBackquote, 0},
+	'~':  {makc.KeyBackQuote, fakerInputKeyBackquote, ModLShift},
+	'-':  {makc.KeyMinus, fakerInputKeyMinus, 0},
+	'_':  {makc.KeyMinus, fakerInputKeyMinus, ModLShift},
+	'=':  {makc.KeyEquals, fakerInputKeyEqual, 0},
+	'+':  {makc.KeyEquals, fakerInputKeyEqual, ModLShift},
+	'[':  {makc.KeyLeftSquareBracket, fakerInputKeyLBracket, 0},
+	'{':  {makc.KeyLeftSquareBracket, fakerInputKeyLBracket, ModLShift},
+	']':  {makc.KeyRightSquareBracket, fakerInputKeyRBracket, 0},
+	'}':  {makc.KeyRightSquareBracket, fakerInputKeyRBracket, ModLShift},
+	'\\': {makc.KeyBackslash, fakerInputKeyBackslash, 0},
+	'|':  {makc.KeyBackslash, fakerInputKeyBackslash, ModLShift},
+	';':  {makc.KeySemicolon, fakerInputKeySemicolon, 0},
+	':':  {makc.KeySemicolon, fakerInputKeySemicolon, ModLShift},
+	'\'': {makc.KeySingleQuote, fakerInputKeyQuote, 0},
+	'"':  {makc.KeySingleQuote, fakerInputKeyQuote, ModLShift},
+	',':  {makc.KeyComma, fakerInputKeyComma, 0},
+	'<':  {makc.KeyComma, fakerInputKeyComma, ModLShift},
+	'.':  {makc.KeyDot, fakerInputKeyPeriod, 0},
+	'>':  {makc.KeyDot, fakerInputKeyPeriod, ModLShift},
+	'/':  {makc.KeySlash, fakerInputKeySlash, 0},
+	'?':  {makc.KeySlash, fakerInputKeySlash, ModLShift},
 
-	' ':    {makc.KeySpace, winput.KeySpace, fakerInputKeySpace, 0},
-	'\n':   {makc.KeyEnter, winput.KeyEnter, fakerInputKeyEnter, 0},
-	'\r':   {makc.KeyEnter, winput.KeyEnter, fakerInputKeyEnter, 0},
-	'\t':   {makc.KeyTab, winput.KeyTab, fakerInputKeyTab, 0},
-	'\b':   {makc.KeyBackspace, winput.KeyBkSp, fakerInputKeyBackspace, 0},
-	'\x1b': {makc.KeyEscape, winput.KeyEsc, fakerInputKeyEscape, 0},
+	' ':    {makc.KeySpace, fakerInputKeySpace, 0},
+	'\n':   {makc.KeyEnter, fakerInputKeyEnter, 0},
+	'\r':   {makc.KeyEnter, fakerInputKeyEnter, 0},
+	'\t':   {makc.KeyTab, fakerInputKeyTab, 0},
+	'\b':   {makc.KeyBackspace, fakerInputKeyBackspace, 0},
+	'\x1b': {makc.KeyEscape, fakerInputKeyEscape, 0},
 }
 
-// KeyCodesFromRune returns the three encodings (and required modifiers) for a
+// KeyCodesFromRune returns the logical key (and required modifiers) for a
 // printable ASCII rune or a supported control rune.
 func KeyCodesFromRune(r rune) (KeyCodes, bool) {
 	kc, ok := keyByRune[r]
 	return kc, ok
 }
 
-// KeyCodesFromMakc returns the three encodings for a makc.Key (Windows
-// virtual-key code).
+// KeyCodesFromMakc returns the logical key for a makc.Key (Windows virtual-key
+// code; makc maps it to the platform representation internally).
 func KeyCodesFromMakc(k makc.Key) (KeyCodes, bool) {
 	kc, ok := keyByMakc[k]
-	return kc, ok
-}
-
-// KeyCodesFromWinput returns the three encodings for a winput.Key (Interception
-// scan code).
-func KeyCodesFromWinput(k winput.Key) (KeyCodes, bool) {
-	kc, ok := keyByWinput[k]
 	return kc, ok
 }
 
@@ -373,84 +358,76 @@ func FakerInputKeyFromMakc(k makc.Key) (code byte, ok bool) {
 	return kc.FakerInput, ok
 }
 
-// FakerInputKeyFromWinput converts a winput.Key (Interception scan code) to a
-// FakerInput USB HID key code.
-func FakerInputKeyFromWinput(k winput.Key) (code byte, ok bool) {
-	kc, ok := keyByWinput[k]
-	return kc.FakerInput, ok
-}
-
 // keyByName maps canonical, lower-case key names (e.g. "enter", "f1", "left",
 // "ctrl") to their KeyCodes. Modifier keys carry their modifier flag in
 // Modifiers and a zero FakerInput code, because FakerInput encodes modifiers as
 // report flags rather than key codes.
 var keyByName = map[string]KeyCodes{
 	// Whitespace and control keys
-	"enter":     {makc.KeyEnter, winput.KeyEnter, fakerInputKeyEnter, 0},
-	"return":    {makc.KeyEnter, winput.KeyEnter, fakerInputKeyEnter, 0},
-	"escape":    {makc.KeyEscape, winput.KeyEsc, fakerInputKeyEscape, 0},
-	"esc":       {makc.KeyEscape, winput.KeyEsc, fakerInputKeyEscape, 0},
-	"backspace": {makc.KeyBackspace, winput.KeyBkSp, fakerInputKeyBackspace, 0},
-	"tab":       {makc.KeyTab, winput.KeyTab, fakerInputKeyTab, 0},
-	"space":     {makc.KeySpace, winput.KeySpace, fakerInputKeySpace, 0},
-	"capslock":  {makc.KeyCapsLock, winput.KeyCaps, fakerInputKeyCapsLock, 0},
+	"enter":     {makc.KeyEnter, fakerInputKeyEnter, 0},
+	"return":    {makc.KeyEnter, fakerInputKeyEnter, 0},
+	"escape":    {makc.KeyEscape, fakerInputKeyEscape, 0},
+	"esc":       {makc.KeyEscape, fakerInputKeyEscape, 0},
+	"backspace": {makc.KeyBackspace, fakerInputKeyBackspace, 0},
+	"tab":       {makc.KeyTab, fakerInputKeyTab, 0},
+	"space":     {makc.KeySpace, fakerInputKeySpace, 0},
+	"capslock":  {makc.KeyCapsLock, fakerInputKeyCapsLock, 0},
 
 	// Function keys
-	"f1":  {makc.KeyF1, winput.KeyF1, fakerInputKeyF1, 0},
-	"f2":  {makc.KeyF2, winput.KeyF2, fakerInputKeyF2, 0},
-	"f3":  {makc.KeyF3, winput.KeyF3, fakerInputKeyF3, 0},
-	"f4":  {makc.KeyF4, winput.KeyF4, fakerInputKeyF4, 0},
-	"f5":  {makc.KeyF5, winput.KeyF5, fakerInputKeyF5, 0},
-	"f6":  {makc.KeyF6, winput.KeyF6, fakerInputKeyF6, 0},
-	"f7":  {makc.KeyF7, winput.KeyF7, fakerInputKeyF7, 0},
-	"f8":  {makc.KeyF8, winput.KeyF8, fakerInputKeyF8, 0},
-	"f9":  {makc.KeyF9, winput.KeyF9, fakerInputKeyF9, 0},
-	"f10": {makc.KeyF10, winput.KeyF10, fakerInputKeyF10, 0},
-	"f11": {makc.KeyF11, winput.KeyF11, fakerInputKeyF11, 0},
-	"f12": {makc.KeyF12, winput.KeyF12, fakerInputKeyF12, 0},
+	"f1":  {makc.KeyF1, fakerInputKeyF1, 0},
+	"f2":  {makc.KeyF2, fakerInputKeyF2, 0},
+	"f3":  {makc.KeyF3, fakerInputKeyF3, 0},
+	"f4":  {makc.KeyF4, fakerInputKeyF4, 0},
+	"f5":  {makc.KeyF5, fakerInputKeyF5, 0},
+	"f6":  {makc.KeyF6, fakerInputKeyF6, 0},
+	"f7":  {makc.KeyF7, fakerInputKeyF7, 0},
+	"f8":  {makc.KeyF8, fakerInputKeyF8, 0},
+	"f9":  {makc.KeyF9, fakerInputKeyF9, 0},
+	"f10": {makc.KeyF10, fakerInputKeyF10, 0},
+	"f11": {makc.KeyF11, fakerInputKeyF11, 0},
+	"f12": {makc.KeyF12, fakerInputKeyF12, 0},
 
 	// Navigation and editing keys
-	"scrolllock": {makc.KeyScrollLock, winput.KeyScroll, fakerInputKeyScrollLock, 0},
-	"insert":     {makc.KeyInsert, winput.KeyInsert, fakerInputKeyInsert, 0},
-	"ins":        {makc.KeyInsert, winput.KeyInsert, fakerInputKeyInsert, 0},
-	"home":       {makc.KeyHome, winput.KeyHome, fakerInputKeyHome, 0},
-	"pageup":     {makc.KeyPageUp, winput.KeyPageUp, fakerInputKeyPageUp, 0},
-	"pgup":       {makc.KeyPageUp, winput.KeyPageUp, fakerInputKeyPageUp, 0},
-	"delete":     {makc.KeyDelete, winput.KeyDelete, fakerInputKeyDelete, 0},
-	"del":        {makc.KeyDelete, winput.KeyDelete, fakerInputKeyDelete, 0},
-	"end":        {makc.KeyEnd, winput.KeyEnd, fakerInputKeyEnd, 0},
-	"pagedown":   {makc.KeyPageDown, winput.KeyPageDown, fakerInputKeyPageDown, 0},
-	"pgdn":       {makc.KeyPageDown, winput.KeyPageDown, fakerInputKeyPageDown, 0},
-	"right":      {makc.KeyRight, winput.KeyRight, fakerInputKeyRightArrow, 0},
-	"left":       {makc.KeyLeft, winput.KeyLeft, fakerInputKeyLeftArrow, 0},
-	"down":       {makc.KeyDown, winput.KeyArrowDown, fakerInputKeyDownArrow, 0},
-	"up":         {makc.KeyUp, winput.KeyArrowUp, fakerInputKeyUpArrow, 0},
-	"numlock":    {makc.KeyNumLock, winput.KeyNumLock, fakerInputKeyNumLock, 0},
+	"scrolllock": {makc.KeyScrollLock, fakerInputKeyScrollLock, 0},
+	"insert":     {makc.KeyInsert, fakerInputKeyInsert, 0},
+	"ins":        {makc.KeyInsert, fakerInputKeyInsert, 0},
+	"home":       {makc.KeyHome, fakerInputKeyHome, 0},
+	"pageup":     {makc.KeyPageUp, fakerInputKeyPageUp, 0},
+	"pgup":       {makc.KeyPageUp, fakerInputKeyPageUp, 0},
+	"delete":     {makc.KeyDelete, fakerInputKeyDelete, 0},
+	"del":        {makc.KeyDelete, fakerInputKeyDelete, 0},
+	"end":        {makc.KeyEnd, fakerInputKeyEnd, 0},
+	"pagedown":   {makc.KeyPageDown, fakerInputKeyPageDown, 0},
+	"pgdn":       {makc.KeyPageDown, fakerInputKeyPageDown, 0},
+	"right":      {makc.KeyRight, fakerInputKeyRightArrow, 0},
+	"left":       {makc.KeyLeft, fakerInputKeyLeftArrow, 0},
+	"down":       {makc.KeyDown, fakerInputKeyDownArrow, 0},
+	"up":         {makc.KeyUp, fakerInputKeyUpArrow, 0},
+	"numlock":    {makc.KeyNumLock, fakerInputKeyNumLock, 0},
 
 	// Modifier keys. FakerInput has no key code for these; the modifier flag is
-	// carried in Modifiers and the winput code is 0 for keys winput cannot
-	// represent (the Windows/Gui key).
-	"ctrl":       {makc.KeyControl, winput.KeyCtrl, 0, ModLCtrl},
-	"control":    {makc.KeyControl, winput.KeyCtrl, 0, ModLCtrl},
-	"lctrl":      {makc.KeyLeftControl, winput.KeyCtrl, 0, ModLCtrl},
-	"leftctrl":   {makc.KeyLeftControl, winput.KeyCtrl, 0, ModLCtrl},
-	"rctrl":      {makc.KeyRightControl, winput.KeyCtrl, 0, ModRCtrl},
-	"rightctrl":  {makc.KeyRightControl, winput.KeyCtrl, 0, ModRCtrl},
-	"shift":      {makc.KeyShift, winput.KeyShift, 0, ModLShift},
-	"lshift":     {makc.KeyLeftShift, winput.KeyShift, 0, ModLShift},
-	"leftshift":  {makc.KeyLeftShift, winput.KeyShift, 0, ModLShift},
-	"rshift":     {makc.KeyRightShift, winput.KeyShift, 0, ModRShift},
-	"rightshift": {makc.KeyRightShift, winput.KeyShift, 0, ModRShift},
-	"alt":        {makc.KeyAlt, winput.KeyAlt, 0, ModLAlt},
-	"lalt":       {makc.KeyLeftAlt, winput.KeyAlt, 0, ModLAlt},
-	"leftalt":    {makc.KeyLeftAlt, winput.KeyAlt, 0, ModLAlt},
-	"ralt":       {makc.KeyRightAlt, winput.KeyAlt, 0, ModRAlt},
-	"rightalt":   {makc.KeyRightAlt, winput.KeyAlt, 0, ModRAlt},
-	"gui":        {makc.KeyLeftWindows, 0, 0, ModLGui},
-	"win":        {makc.KeyLeftWindows, 0, 0, ModLGui},
-	"windows":    {makc.KeyLeftWindows, 0, 0, ModLGui},
-	"super":      {makc.KeyLeftWindows, 0, 0, ModLGui},
-	"meta":       {makc.KeyLeftWindows, 0, 0, ModLGui},
+	// carried in Modifiers.
+	"ctrl":       {makc.KeyControl, 0, ModLCtrl},
+	"control":    {makc.KeyControl, 0, ModLCtrl},
+	"lctrl":      {makc.KeyLeftControl, 0, ModLCtrl},
+	"leftctrl":   {makc.KeyLeftControl, 0, ModLCtrl},
+	"rctrl":      {makc.KeyRightControl, 0, ModRCtrl},
+	"rightctrl":  {makc.KeyRightControl, 0, ModRCtrl},
+	"shift":      {makc.KeyShift, 0, ModLShift},
+	"lshift":     {makc.KeyLeftShift, 0, ModLShift},
+	"leftshift":  {makc.KeyLeftShift, 0, ModLShift},
+	"rshift":     {makc.KeyRightShift, 0, ModRShift},
+	"rightshift": {makc.KeyRightShift, 0, ModRShift},
+	"alt":        {makc.KeyAlt, 0, ModLAlt},
+	"lalt":       {makc.KeyLeftAlt, 0, ModLAlt},
+	"leftalt":    {makc.KeyLeftAlt, 0, ModLAlt},
+	"ralt":       {makc.KeyRightAlt, 0, ModRAlt},
+	"rightalt":   {makc.KeyRightAlt, 0, ModRAlt},
+	"gui":        {makc.KeyLeftWindows, 0, ModLGui},
+	"win":        {makc.KeyLeftWindows, 0, ModLGui},
+	"windows":    {makc.KeyLeftWindows, 0, ModLGui},
+	"super":      {makc.KeyLeftWindows, 0, ModLGui},
+	"meta":       {makc.KeyLeftWindows, 0, ModLGui},
 }
 
 // KeyCodesFromName resolves a key name (e.g. "enter", "F1", "left", "ctrl")

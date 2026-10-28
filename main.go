@@ -10,13 +10,20 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
+	"runtime"
 	"syscall"
 	"time"
 )
 
 func main() {
 	v, commit, buildTime := version.Info()
-	slog.Info("GoKeyMux build info", "version", v, "commit", commit, "buildTime", buildTime)
+	slog.Info("GoKeyMux build info",
+		"version", v,
+		"commit", commit,
+		"buildTime", buildTime,
+		"os", runtime.GOOS,
+		"arch", runtime.GOARCH,
+	)
 
 	err := config.LoadConfig()
 	if err != nil {

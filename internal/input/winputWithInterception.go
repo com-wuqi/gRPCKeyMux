@@ -1,3 +1,5 @@
+//go:build windows
+
 package input
 
 import (
@@ -85,15 +87,17 @@ func WinputWithInterceptionInit() error {
 }
 
 func WinputWithInterceptionPress(key KeyCodes) error {
-	if key.Winput == 0 {
+	scan := winputKey(key)
+	if scan == 0 {
 		return fmt.Errorf("key not supported by winput backend")
 	}
-	return winput.KeyDown(key.Winput)
+	return winput.KeyDown(scan)
 }
 
 func WinputWithInterceptionRelease(key KeyCodes) error {
-	if key.Winput == 0 {
+	scan := winputKey(key)
+	if scan == 0 {
 		return fmt.Errorf("key not supported by winput backend")
 	}
-	return winput.KeyUp(key.Winput)
+	return winput.KeyUp(scan)
 }

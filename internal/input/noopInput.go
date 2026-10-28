@@ -35,6 +35,11 @@ func NewNoopDevice(latency time.Duration) *NoopDevice {
 	return &NoopDevice{latency: latency}
 }
 
+// Name implements Backend.
+func (d *NoopDevice) Name() string { return "noop" }
+
+var _ Backend = (*NoopDevice)(nil)
+
 // Close marks the device as closed. Subsequent injections fail, which lets
 // tests verify that shutdown releases held input before the backend is closed.
 func (d *NoopDevice) Close() error {

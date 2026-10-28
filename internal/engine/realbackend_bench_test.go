@@ -1,4 +1,4 @@
-//go:build realbackend
+//go:build realbackend && windows
 
 package engine
 
@@ -84,7 +84,7 @@ func newRealBenchMakcSendInputEngine(b *testing.B) *Engine {
 	// which would open its own auto-selected client.
 	e := NewEngine()
 	e.driveName = DriveMakc
-	e.driveClient = client
+	e.driveClient = &input.MakcBackend{Client: client}
 	e.wg.Add(2)
 	go e.run()
 	go e.runMouse()

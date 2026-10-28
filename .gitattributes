@@ -1,0 +1,2 @@
+# Keep shell scripts LF so they run on Linux/macOS after checkout.
+*.sh text eol=lf
