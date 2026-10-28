@@ -540,7 +540,7 @@ go test -c -o .\GoKeyMux.realbench.test.exe -tags realbackend ./internal/engine
 
 ### CI（`.github/workflows/ci.yml`）
 
-`push` / `pull_request` 到 `master` 时触发，并行执行 Windows 与 Linux 两个 job：
+`push` / `pull_request` 到 `main` / `master` 时触发，并行执行 Windows 与 Linux 两个 job：
 
 - `build-test`（`windows-latest`）
 - `build-test-linux`（`ubuntu-latest`，`CGO_ENABLED=0`）
